@@ -1,0 +1,435 @@
+{
+  "name": "Daily Tech News Digest - Energy & IoT Focus",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://webrazzi.com/feed/",
+        "options": {}
+      },
+      "id": "rss-webrazzi",
+      "name": "RSS - Webrazzi",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        450,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.aa.com.tr/tr/rss/default?cat=bilimteknoloji",
+        "options": {}
+      },
+      "id": "rss-aa-teknoloji",
+      "name": "RSS - AA Teknoloji",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.shiftdelete.net/feed",
+        "options": {}
+      },
+      "id": "rss-shiftdelete",
+      "name": "RSS - ShiftDelete",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        450,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://techcrunch.com/feed/",
+        "options": {}
+      },
+      "id": "rss-techcrunch",
+      "name": "RSS - TechCrunch",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        450,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.theverge.com/rss/index.xml",
+        "options": {}
+      },
+      "id": "rss-theverge",
+      "name": "RSS - The Verge",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        450,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.arstechnica.com/arstechnica/index",
+        "options": {}
+      },
+      "id": "rss-arstechnica",
+      "name": "RSS - Ars Technica",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        450,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.technologyreview.com/feed/",
+        "options": {}
+      },
+      "id": "rss-mittr",
+      "name": "RSS - MIT Tech Review",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        450,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "merge-all-feeds",
+      "name": "Merge All Feeds",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        650,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Son 24 saatteki haberleri filtrele\nconst now = new Date();\nconst yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);\n\nconst recentNews = $input.all().filter(item => {\n  const pubDate = new Date(item.json.pubDate || item.json.isoDate);\n  return pubDate >= yesterday;\n});\n\n// Rastgele karıştır (çeşitlilik için)\nconst shuffled = recentNews.sort(() => Math.random() - 0.5);\n\n// İlk 30 haberi al (Gemini filtrelemesi için)\nconst topNews = shuffled.slice(0, 30);\n\nreturn topNews.map(item => ({\n  json: {\n    title: item.json.title,\n    link: item.json.link,\n    description: item.json.contentSnippet || item.json.description || '',\n    pubDate: item.json.pubDate || item.json.isoDate,\n    source: item.json.creator || item.json['dc:creator'] || 'Unknown'\n  }\n}));"
+      },
+      "id": "filter-recent-news",
+      "name": "Filter Recent News (24h)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tüm haberleri tek bir prompt'a hazırla\nconst allNews = $input.all();\n\nconst newsText = allNews.map((item, index) => {\n  return `[${index + 1}]\\nKaynak: ${item.json.source}\\nBaşlık: ${item.json.title}\\nAçıklama: ${item.json.description}\\n---`;\n}).join('\\n\\n');\n\nreturn [{\n  json: {\n    newsText: newsText,\n    allNews: allNews\n  }\n}];"
+      },
+      "id": "prepare-for-gemini",
+      "name": "Prepare for Gemini",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent",
+        "authentication": "none",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyAHZOSgeGXJ69RUTk9hORI4pHAIh4EW-5Y"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Sen bir teknoloji haber editörüsün. Aşağıdaki haberler arasından en önemli haberleri 3 kategoriye ayır.\\n\\nKATEGORİ 1 - STARTUP VE YATIRIM HABERLERİ (5-7 haber):\\n- Startup fonlama/yatırım haberleri\\n- Şirket satın almaları (M&A)\\n- Girişim sermayesi haberleri\\n- Yeni kurulan önemli startuplar\\n- IPO/halka arz haberleri\\n\\nKATEGORİ 2 - TEKNOLOJİ VE IoT HABERLERİ (5-10 haber):\\n- IoT teknolojileri ve uygulamaları\\n- Yapay zeka uygulamaları\\n- Akıllı şehirler, endüstriyel otomasyon\\n- Büyük teknoloji şirketlerinin ürün/hizmet haberleri\\n- Yeni teknoloji trendleri\\n\\nKATEGORİ 3 - ENERJİ SEKTÖRÜ HABERLERİ (EN AZ 4 HABER - ZORUNLU):\\n- Yenilenebilir enerji (güneş, rüzgar, hidroelektrik)\\n- Enerji depolama teknolojileri (batarya, akü)\\n- Elektrikli araçlar ve şarj altyapısı\\n- Enerji verimliliği\\n- Akıllı şebekeler (smart grid)\\n- Nükleer enerji\\n- Petrol, doğalgaz haberleri\\n- Enerji şirketlerinin hamleleri\\n\\nÖNEMLİ: ENERJİ kategorisinde MUTLAKA en az 4 haber seç!\\n\\nÇIKTI FORMATI (TAM OLARAK BU FORMATTA VER):\\nSTARTUP: 1,5,7,12,15\\nTEKNOLOJİ: 3,8,10,14,18,22\\nENERJİ: 2,9,16,20\\n\\nHABERLER:\\n\" + $json.newsText\n    }]\n  }]\n}) }}",
+        "options": {}
+      },
+      "id": "gemini-filter",
+      "name": "Gemini API - Filter News",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1250,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gemini'nin kategorize edilmiş seçimini parse et\nconst geminiResponse = $input.first().json;\n\n// Gemini response kontrolü\nif (!geminiResponse || !geminiResponse.candidates || !geminiResponse.candidates[0]) {\n  console.error('Gemini response invalid:', JSON.stringify(geminiResponse));\n  return [{\n    json: {\n      startupNews: [],\n      techNews: [],\n      energyNews: [],\n      totalCount: 0,\n      error: 'Gemini API yanıt vermedi'\n    }\n  }];\n}\n\nconst responseText = geminiResponse.candidates[0].content.parts[0].text;\nconsole.log('Gemini response:', responseText);\n\n// Kategorileri parse et\nconst startupMatch = responseText.match(/STARTUP:\\s*([\\d,\\s]+)/i);\nconst techMatch = responseText.match(/TEKNOLOJİ:\\s*([\\d,\\s]+)/i);\nconst energyMatch = responseText.match(/ENERJİ:\\s*([\\d,\\s]+)/i);\n\n// Önceki adımdan tüm haberleri al\nconst allNews = $('Prepare for Gemini').first().json.allNews;\n\nif (!allNews || allNews.length === 0) {\n  return [{\n    json: {\n      startupNews: [],\n      techNews: [],\n      energyNews: [],\n      totalCount: 0,\n      error: 'Hiç haber bulunamadı'\n    }\n  }];\n}\n\nconst result = {\n  startup: [],\n  tech: [],\n  energy: []\n};\n\nif (startupMatch && startupMatch[1]) {\n  const startupIndices = startupMatch[1].match(/\\d+/g);\n  if (startupIndices) {\n    result.startup = startupIndices.map(num => parseInt(num) - 1).map(index => allNews[index]).filter(Boolean);\n  }\n}\n\nif (techMatch && techMatch[1]) {\n  const techIndices = techMatch[1].match(/\\d+/g);\n  if (techIndices) {\n    result.tech = techIndices.map(num => parseInt(num) - 1).map(index => allNews[index]).filter(Boolean);\n  }\n}\n\nif (energyMatch && energyMatch[1]) {\n  const energyIndices = energyMatch[1].match(/\\d+/g);\n  if (energyIndices) {\n    result.energy = energyIndices.map(num => parseInt(num) - 1).map(index => allNews[index]).filter(Boolean);\n  }\n}\n\nreturn [{\n  json: {\n    startupNews: result.startup,\n    techNews: result.tech,\n    energyNews: result.energy,\n    totalCount: result.startup.length + result.tech.length + result.energy.length\n  }\n}];"
+      },
+      "id": "parse-gemini-selection",
+      "name": "Parse Gemini Selection",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst startupNews = data.startupNews || [];\nconst techNews = data.techNews || [];\nconst energyNews = data.energyNews || [];\n\n// HTML email oluştur\nlet emailHTML = `\n<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4; padding: 20px; }\n    .container { max-width: 800px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }\n    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 30px; }\n    .header h1 { margin: 0; font-size: 24px; }\n    .header p { margin: 5px 0 0 0; opacity: 0.9; }\n    .category-header { \n      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); \n      color: white; \n      padding: 15px 20px; \n      border-radius: 8px; \n      margin: 30px 0 20px 0;\n      display: flex;\n      justify-content: space-between;\n      align-items: center;\n    }\n    .category-header.tech { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }\n    .category-header.energy { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }\n    .category-header h2 { margin: 0; font-size: 20px; }\n    .category-header .count { opacity: 0.9; font-size: 14px; }\n    .news-item { border-left: 4px solid #667eea; padding: 15px; margin-bottom: 20px; background-color: #f9f9f9; border-radius: 5px; }\n    .news-item h3 { margin: 0 0 10px 0; font-size: 18px; color: #333; }\n    .news-item .preview { margin: 0 0 15px 0; color: #666; line-height: 1.6; font-size: 14px; }\n    .news-item .meta { font-size: 12px; color: #999; margin-bottom: 15px; }\n    \n    /* HTML details/summary accordion */\n    details { margin: 15px 0; }\n    details summary {\n      background-color: #667eea;\n      color: white;\n      padding: 12px 18px;\n      border-radius: 5px;\n      cursor: pointer;\n      font-size: 14px;\n      font-weight: 500;\n      list-style: none;\n      user-select: none;\n      display: inline-block;\n      margin-right: 10px;\n    }\n    details summary::-webkit-details-marker { display: none; }\n    details summary:hover { background-color: #5568d3; }\n    details summary:before { content: '📖 Haberi Oku'; }\n    details[open] summary:before { content: '🔼 Kapat'; }\n    \n    details .full-content {\n      margin: 15px 0 0 0;\n      padding: 15px;\n      background-color: white;\n      border-radius: 5px;\n      color: #444;\n      line-height: 1.8;\n      border: 1px solid #e0e0e0;\n    }\n    \n    .button-group { display: inline-flex; gap: 10px; flex-wrap: wrap; }\n    .btn { \n      display: inline-block; \n      padding: 12px 18px; \n      text-decoration: none; \n      border-radius: 5px; \n      font-size: 14px; \n      font-weight: 500;\n      cursor: pointer;\n      border: none;\n      transition: all 0.3s;\n    }\n    .btn-secondary { background-color: #e0e0e0; color: #333; }\n    .btn-secondary:hover { background-color: #d0d0d0; }\n    .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #999; font-size: 12px; }\n    .empty-category { text-align: center; color: #999; padding: 20px; font-style: italic; }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <div class=\"header\">\n      <h1>🚀 Günlük Teknoloji Özeti</h1>\n      <p>Teknoloji, Yatırım & Enerji | ${new Date().toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>\n    </div>\n`;\n\n// STARTUP VE YATIRIM HABERLERİ\nemailHTML += `\n    <div class=\"category-header\">\n      <h2>💰 Startup ve Yatırım Haberleri</h2>\n      <span class=\"count\">${startupNews.length} haber</span>\n    </div>\n`;\n\nif (startupNews.length > 0) {\n  startupNews.forEach((item, index) => {\n    const preview = item.json.description.substring(0, 200) + (item.json.description.length > 200 ? '...' : '');\n    const fullContent = item.json.description;\n    \n    emailHTML += `\n    <div class=\"news-item\">\n      <div class=\"meta\">#${index + 1} • ${item.json.source}</div>\n      <h3>${item.json.title}</h3>\n      <p class=\"preview\">${preview}</p>\n      \n      <details>\n        <summary></summary>\n        <div class=\"full-content\">${fullContent}</div>\n      </details>\n      \n      <div class=\"button-group\">\n        <a href=\"${item.json.link}\" target=\"_blank\" class=\"btn btn-secondary\">🌐 Siteden Oku →</a>\n      </div>\n    </div>\n    `;\n  });\n} else {\n  emailHTML += '<div class=\"empty-category\">Bugün bu kategoride haber bulunamadı.</div>';\n}\n\n// TEKNOLOJİ VE IoT HABERLERİ\nemailHTML += `\n    <div class=\"category-header tech\">\n      <h2>🤖 Teknoloji ve IoT Haberleri</h2>\n      <span class=\"count\">${techNews.length} haber</span>\n    </div>\n`;\n\nif (techNews.length > 0) {\n  techNews.forEach((item, index) => {\n    const preview = item.json.description.substring(0, 200) + (item.json.description.length > 200 ? '...' : '');\n    const fullContent = item.json.description;\n    \n    emailHTML += `\n    <div class=\"news-item\">\n      <div class=\"meta\">#${index + 1} • ${item.json.source}</div>\n      <h3>${item.json.title}</h3>\n      <p class=\"preview\">${preview}</p>\n      \n      <details>\n        <summary></summary>\n        <div class=\"full-content\">${fullContent}</div>\n      </details>\n      \n      <div class=\"button-group\">\n        <a href=\"${item.json.link}\" target=\"_blank\" class=\"btn btn-secondary\">🌐 Siteden Oku →</a>\n      </div>\n    </div>\n    `;\n  });\n} else {\n  emailHTML += '<div class=\"empty-category\">Bugün bu kategoride haber bulunamadı.</div>';\n}\n\n// ENERJİ SEKTÖRÜ HABERLERİ\nemailHTML += `\n    <div class=\"category-header energy\">\n      <h2>⚡ Enerji Sektörü Haberleri</h2>\n      <span class=\"count\">${energyNews.length} haber</span>\n    </div>\n`;\n\nif (energyNews.length > 0) {\n  energyNews.forEach((item, index) => {\n    const preview = item.json.description.substring(0, 200) + (item.json.description.length > 200 ? '...' : '');\n    const fullContent = item.json.description;\n    \n    emailHTML += `\n    <div class=\"news-item\">\n      <div class=\"meta\">#${index + 1} • ${item.json.source}</div>\n      <h3>${item.json.title}</h3>\n      <p class=\"preview\">${preview}</p>\n      \n      <details>\n        <summary></summary>\n        <div class=\"full-content\">${fullContent}</div>\n      </details>\n      \n      <div class=\"button-group\">\n        <a href=\"${item.json.link}\" target=\"_blank\" class=\"btn btn-secondary\">🌐 Siteden Oku →</a>\n      </div>\n    </div>\n    `;\n  });\n} else {\n  emailHTML += '<div class=\"empty-category\">Bugün bu kategoride haber bulunamadı.</div>';\n}\n\nconst totalNews = startupNews.length + techNews.length + energyNews.length;\n\nemailHTML += `\n    <div class=\"footer\">\n      <p>📊 Toplam ${totalNews} önemli haber seçildi</p>\n      <p>💰 ${startupNews.length} Startup • 🤖 ${techNews.length} Teknoloji • ⚡ ${energyNews.length} Enerji</p>\n      <p>Bu özet Gemini AI tarafından filtrelenmiştir</p>\n    </div>\n  </div>\n</body>\n</html>\n`;\n\nreturn [{\n  json: {\n    emailBody: emailHTML,\n    newsCount: totalNews,\n    subject: `📰 Günlük Teknoloji Özeti - ${new Date().toLocaleDateString('tr-TR')} (${totalNews} Haber)`\n  }\n}];"
+      },
+      "id": "format-email",
+      "name": "Format Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1650,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "gulaymuhammed41@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.emailBody }}",
+        "options": {}
+      },
+      "id": "send-gmail",
+      "name": "Send Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1850,
+        450
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "RSS - Webrazzi",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - AA Teknoloji",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - ShiftDelete",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - TechCrunch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - The Verge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - Ars Technica",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "RSS - MIT Tech Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - Webrazzi": {
+      "main": [
+        [
+          {
+            "node": "Merge All Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS - AA Teknoloji": {
+      "main": [
+        [
+          {
+            "node": "Merge All Feeds",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "RSS - ShiftDelete": {
+      "main": [
+        [
+          {
+            "node": "Merge All Feeds",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "RSS - TechCrunch": {
+      "main": [
+        [
+          {
+            "node": "Merge All Feeds",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "RSS - The Verge": {
+      "main": [
+        [
+          {
+            "node": "Merge All Feeds",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "RSS - Ars Technica": {
+      "main": [
+        [
+          {
+            "node": "Merge All Feeds",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "RSS - MIT Tech Review": {
+      "main": [
+        [
+          {
+            "node": "Merge All Feeds",
+            "type": "main",
+            "index": 6
+          }
+        ]
+      ]
+    },
+    "Merge All Feeds": {
+      "main": [
+        [
+          {
+            "node": "Filter Recent News (24h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Recent News (24h)": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Gemini": {
+      "main": [
+        [
+          {
+            "node": "Gemini API - Filter News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini API - Filter News": {
+      "main": [
+        [
+          {
+            "node": "Parse Gemini Selection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Gemini Selection": {
+      "main": [
+        [
+          {
+            "node": "Format Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email": {
+      "main": [
+        [
+          {
+            "node": "Send Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-02-13T00:00:00.000Z",
+  "versionId": "1"
+}
