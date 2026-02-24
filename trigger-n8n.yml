@@ -1,0 +1,15 @@
+name: Trigger n8n Workflow
+
+on:
+  schedule:
+    - cron: '0 8 * * *'    # UTC 08:00
+  workflow_dispatch:       # İstersen manuel de tetikleyebilirsin
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Trigger workflow via webhook
+      run: |
+        curl -X POST "https://<YOUR_N8N_WEBHOOK_URL>"
